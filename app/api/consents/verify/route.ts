@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requirePermission } from '../../../../lib/auth';
 export async function POST(request: Request) {
-  const access = requirePermission(request, 'consent:manage');
+  const access = requirePermission(request, 'consent:request');
   if (!access.ok) return access.response;
   const body = await request.json().catch(() => null);
   if (!body?.consentId || !body?.otp) return NextResponse.json({ error: 'consentId and otp are required' }, { status: 400 });
