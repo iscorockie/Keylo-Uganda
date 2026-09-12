@@ -18,6 +18,17 @@ create table risk_scores (id uuid primary key default uuid_generate_v4(), deal_i
 create table decisions (id uuid primary key default uuid_generate_v4(), deal_id uuid not null references deals(id), risk_score_id uuid not null references risk_scores(id), outcome text not null, conditions jsonb not null default '[]', approved_by uuid references users(id), decided_at timestamptz, notes text);
 create table audit_log (id bigserial primary key, organization_id uuid not null references organizations(id), actor_id uuid references users(id), entity_type text not null, entity_id uuid, action text not null, metadata jsonb not null default '{}', created_at timestamptz not null default now());
 create index deals_org_status on deals(organization_id,status); create index risk_scores_deal on risk_scores(deal_id,calculated_at desc); create index audit_org_time on audit_log(organization_id,created_at desc);
+-- RBAC: roles and permissions are organization-aware and auditable.
+create table roles (id uuid primary key default uuid_generate_v4(), organization_id uuid references organizations(id), name text not null, description text, is_system boolean not null default false, unique(organization_id,name));
+create table permissions (id uuid primary key default uuid_generate_v4(), code text unique not null, description text not null);
+create table role_permissions (role_id uuid not null references roles(id) on delete cascade, permission_id uuid not null references permissions(id) on delete cascade, primary key(role_id,permission_id));
+create table user_roles (user_id uuid not null references users(id) on delete cascade, role_id uuid not null references roles(id) on delete cascade, assigned_by uuid references users(id), assigned_at timestamptz not null default now(), primary key(user_id,role_id));
+create table organization_invites (id uuid primary key default uuid_generate_v4(), organization_id uuid not null references organizations(id), email text not null, role_id uuid not null references roles(id), token_hash text not null, invited_by uuid not null references users(id), expires_at timestamptz not null, accepted_at timestamptz, created_at timestamptz not null default now());
+
+insert into permissions(code,description) values
+ ('deal:create','Create a new deal'),('deal:edit','Edit a draft deal'),('deal:view','View permitted deals'),('deal:score','Trigger risk assessment'),('deal:adjust','Adjust recommended terms'),('decision:make','Approve or decline a deal'),('decision:request-info','Request more information'),('policy:manage','Manage organization policy'),('users:manage','Invite and manage users'),('org:manage','Manage organization settings'),('reports:view','View reports'),('audit:export','Export audit records'),('consent:manage','Start and verify consent'),('consent:view','View consent status'),('payments:configure','Configure payment credentials'),('platform:manage','Manage all platform organizations')
+on conflict (code) do nothing;
+
 -- Compatibility note: data_consents is the richer canonical consent record; payment_events is the webhook inbox.
 -- payments is the normalized payment ledger used by deal views. audit_log is the append-only audit source.
 -- Never store raw NIN or phone; retain only salted hashes and explicit consent timestamps.
