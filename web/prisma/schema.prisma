@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================================================
+// Tenancy & users
+// ===========================================================================
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  status    String   @default("active") // active | suspended | closed
+  settings  String   @default("{}")     // JSON
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members       OrganizationMember[]
+  deals         Deal[]
+  auditLogs     AuditLog[]
+  riskRules     RiskRule[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  fullName     String
+  phone        String?
+  passwordHash String
+  status       String   @default("active") // active | invited | suspended | deactivated
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships OrganizationMember[]
+  auditLogs   AuditLog[]
+}
+
+// ===========================================================================
+// Roles & permissions (system catalog)
+// ===========================================================================
+model Role {
+  id          String   @id @default(cuid())
+  key         String   @unique // org_admin | underwriter | dealer_staff | finance | viewer | auditor
+  name        String
+  description String?
+  isSystem    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  permissions RolePermission[]
+  members     OrganizationMember[]
+}
+
+model Permission {
+  id        String   @id @default(cuid())
+  code      String   @unique // deal.create, credit.pull, decision.approve, ...
+  name      String
+  category  String   // deal | consent | risk | decision | payment | subscription | org | audit
+  sensitive Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model OrganizationMember {
+  id        String   @id @default(cuid())
+  orgId     String
+  userId    String
+  roleId    String
+  status    String   @default("active") // active | suspended | removed
+  invitedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     Role         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([orgId, userId])
+}
+
+// ===========================================================================
+// Deal domain
+// ===========================================================================
+model Subscriber {
+  id        String   @id @default(cuid())
+  orgId     String
+  nin       String
+  phone     String
+  name      String
+  createdAt DateTime @default(now())
+
+  @@unique([orgId, nin])
+}
+
+model Vehicle {
+  id        String   @id @default(cuid())
+  orgId     String
+  plate     String
+  make      String
+  model     String
+  year      Int
+  value     Float // market value, used in asset score
+  createdAt DateTime @default(now())
+
+  @@unique([orgId, plate])
+}
+
+model Deal {
+  id          String   @id @default(cuid())
+  orgId       String
+  createdBy   String
+  status      String   @default("draft") // draft|submitted|consent_pending|in_review|approved|declined|info_requested|activated|active|completed|cancelled
+  vehicleJson String   // denormalized snapshot at creation
+  subJson     String   // denormalized snapshot at creation
+  proposed    String   // JSON {deposit, termMonths, monthlyAmount, assetValue}
+  decision    String?  // JSON
+  declinedReason String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  consents Consent[]
+  risk     RiskAssessment[]
+  payments Payment[]
+  subscription Subscription?
+
+  @@index([orgId, status])
+}
+
+// ===========================================================================
+// Consent (append-only in spirit — immutableHash guards tampering)
+// ===========================================================================
+model Consent {
+  id             String    @id @default(cuid())
+  orgId          String
+  dealId         String
+  subscriberId   String
+  method         String    @default("otp")
+  phone          String
+  nin            String
+  status         String    @default("pending") // pending|granted|withdrawn|expired|failed
+  otpReference   String?
+  otpCodeHash    String?
+  initiatedBy    String
+  grantedAt      DateTime?
+  withdrawnAt    DateTime?
+  withdrawnBy    String?
+  withdrawReason String?
+  ipAddress      String
+  userAgent      String?
+  immutableHash  String
+  createdAt      DateTime  @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+}
+
+// ===========================================================================
+// Risk assessment
+// ===========================================================================
+model RiskAssessment {
+  id                 String   @id @default(cuid())
+  dealId             String
+  gnuGridScore       Int?
+  internalAssetScore Int?
+  combinedScore      Int
+  tier               String
+  explanation        String   @default("[]") // JSON array
+  recommended        String   @default("{}") // JSON
+  providerRef        String?
+  createdAt          DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+}
+
+// ===========================================================================
+// Payments & subscription
+// ===========================================================================
+model Payment {
+  id          String   @id @default(cuid())
+  dealId      String
+  channel     String   // mtn | airtel
+  amount      Float
+  status      String   @default("pending") // pending|requested|success|failed
+  providerRef String?
+  createdAt   DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+}
+
+model Subscription {
+  id          String    @id @default(cuid())
+  dealId      String    @unique
+  status      String    @default("active") // active | completed | cancelled
+  schedule    String    @default("[]") // JSON installments
+  activatedAt DateTime  @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+// ===========================================================================
+// Org risk rules & audit
+// ===========================================================================
+model RiskRule {
+  id        String   @id @default(cuid())
+  orgId     String
+  config    String   @default("{}") // JSON thresholds/weights
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId])
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  orgId      String
+  userId     String?
+  action     String   // credit.pull | decision.approve | consent.granted | ...
+  entityType String
+  entityId   String
+  before     String?  // JSON
+  after      String?  // JSON
+  meta       String?  // JSON
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+  @@index([entityType, entityId])
+}
