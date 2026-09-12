@@ -1,5 +1,20 @@
 # Ready-to-Use Prompt: Scaffold the Keylo Uganda Next.js Frontend (RBAC-first)
 
+> **Status: executed.** This prompt has been run — the resulting app lives in `web/` and
+> implements the RBAC matrix, login, dashboard, deals (list/new/detail), OTP consent,
+> risk assessment, decision workflow, and audit log. Two intentional deviations from the
+> prompt below, made for sandbox portability:
+>
+> 1. **Database** — used Node's built-in `node:sqlite` (`web/src/lib/db.ts`) instead of
+>    Prisma + Postgres, because Prisma's engine binaries can't be downloaded in this
+>    environment. The Prisma schema is kept at `web/prisma/schema.prisma` as the
+>    Postgres blueprint.
+> 2. **Auth** — used a lightweight JWT cookie session (`jose` + `bcryptjs`) instead of
+>    NextAuth, for the same reason (fewer moving parts, no external config). NextAuth can
+>    be swapped in later behind `lib/session.ts`.
+>
+> The prompt below remains the canonical spec for rebuilding on the full stack.
+
 Copy the block below (everything between the `---BEGIN---` / `---END---` markers) into
 your coding agent. It is written to be pasted verbatim.
 

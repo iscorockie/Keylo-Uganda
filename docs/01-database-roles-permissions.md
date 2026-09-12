@@ -1,11 +1,23 @@
 # Keylo Uganda — Database: Roles, Permissions & Audit
 
-> Target: PostgreSQL (Prisma ORM in the Next.js app). `uuid` PKs, `jsonb` for flexible
+> **Status: shipped.** The RBAC/audit model below is implemented in `web/src/lib/db.ts`
+> (schema) and `web/db/seed.ts` (roles/permissions/org/users). The running app uses
+> **Node's built-in SQLite (`node:sqlite`)** rather than Postgres/Prisma — the Prisma
+> engine binaries can't be downloaded in sandboxed environments, and `node:sqlite` needs
+> no external engine. The Postgres DDL below remains the **production blueprint**; a
+> reference Prisma schema is at `web/prisma/schema.prisma`.
+
+> Target (production): PostgreSQL (Prisma ORM). `uuid` PKs, `jsonb` for flexible
 > metadata, `timestamptz` for everything. Enums via Postgres `CREATE TYPE`.
 >
 > This doc is the RBAC/audit slice of the schema. Domain tables (vehicles, deals,
 > subscriptions, payments) are referenced where RBAC touches them; a full domain schema
 > is in `02-api-endpoints.md`.
+
+> **Implementation note:** in the SQLite build, enums are `TEXT` columns with the
+> documented values enforced at the API layer, `jsonb` is `TEXT` holding JSON, and
+> `bigint`/`inet`/`citext` collapse to `TEXT`. The permission catalog and role→permission
+> matrix below are **identical** to what is seeded.
 
 ---
 

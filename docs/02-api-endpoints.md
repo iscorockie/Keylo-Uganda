@@ -1,9 +1,17 @@
 # Keylo Uganda — API Endpoints (v1)
 
+> **Status: shipped.** The endpoints below are implemented as Next.js App Router route
+> handlers under `web/src/app/api/`. The live app uses JWT session **cookies** (not a
+> bearer header) via `web/src/lib/session.ts`, and org scope comes from the **URL path**
+> (`/api/orgs/[orgId]/…`) — the server verifies the signed-in user is a member of that org
+> (the earlier `X-Org-Id` header approach was dropped as redundant). The dashboard and
+> audit pages read the DB directly rather than via these routes; the routes serve the
+> client-side actions (deal form, consent, risk pull, decision).
+
 > Next.js App Router route handlers under `/api`. Every endpoint is:
-> 1. **Authenticated** (session / JWT bearer).
-> 2. **Org-scoped** — the `orgId` comes from the signed session (or an explicit
->    `X-Org-Id` header the server validates against the user's memberships).
+> 1. **Authenticated** (JWT session cookie).
+> 2. **Org-scoped** — `orgId` comes from the URL path and is validated against the user's
+>    memberships (`requirePermission(req, orgId, permission)`).
 > 3. **Authorized** via `can(user, orgId, permission)`.
 >
 > Convention: `409` = domain conflict (e.g. consent missing), `403` = authenticated but
