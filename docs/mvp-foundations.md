@@ -4,26 +4,33 @@ This document locks the product decisions that must sit underneath the UI. The f
 
 ## 1. Roles and permissions
 
-| Capability | Dealer staff | Underwriter | Organization admin | Super admin |
-|---|---:|---:|---:|---:|
-| Create/edit draft deals | Yes | Yes | Yes | Yes |
-| View organization deals and scores | Own/assigned | Yes | Yes | Yes |
-| Trigger score / view explainability | No | Yes | Yes | Yes |
-| Approve, decline, refer | No | Yes | Yes | Yes |
-| Change risk and pricing policy | No | No | Yes | Yes |
-| Invite/deactivate organization users | No | No | Yes | Yes |
-| Export audit / decisions | No | Yes | Yes | Yes |
-| Manage organizations and providers | No | No | No | Yes |
+| Capability | Super admin | Org admin | Underwriter | Dealer staff | Viewer |
+|---|---:|---:|---:|---:|---:|
+| Manage platform settings / organizations | Yes | No | No | No | No |
+| Invite/manage users in own organization | Yes | Yes | No | No | No |
+| Set organization risk appetite and pricing | Yes | Yes | No | No | No |
+| Create a new deal | Yes | Yes | Yes | Yes | No |
+| Edit draft deals | Yes | Yes | Yes | Own only | No |
+| Trigger risk assessment / credit pull | Yes | Yes | Yes | Yes | No |
+| View full score and explanation | Yes | Yes | Yes | Yes | Yes |
+| Adjust recommended terms | Yes | Yes | Yes | Limited | No |
+| Approve / decline deal | Yes | Yes | Yes | No | No |
+| View organization deals | Yes | Yes | Yes | Own only | Yes |
+| Portfolio reports / analytics | Yes | Yes | Yes | Limited | Yes |
+| Export decision logs / audit | Yes | Yes | Yes | No | No |
+| Manage consent records | Yes | Yes | View | View | No |
+| Configure MoMo merchant accounts | Yes | Yes | No | No | No |
+| View NIN / phone | Full | Full | Full | Masked | Masked |
 
-Every API query is organization-scoped. A super admin’s cross-tenant access is an explicit support action and is audited.
+Dealer staff can submit deals and initiate consent, but cannot make final credit decisions. Credit pulls, consent changes, policy changes and decisions are fully audited. Every API query is organization-scoped; super-admin cross-tenant access is an explicit audited support action.
 
 ## 2. Consent flow
 
-1. Underwriter records subscriber phone and NIN only after explaining the purpose, providers, data categories, retention and withdrawal channel.
-2. Subscriber chooses OTP to phone (default), digital signature, or a scanned physical consent form as fallback. A form upload is access-controlled and virus-scanned.
-3. KeyLo stores the exact disclosure version, purpose (`credit_check` or `payment`), provider, actor, timestamp, method and a consent id. Raw NIN/phone are never written to the scoring payload.
+1. Dealer or underwriter enters subscriber phone and NIN only after explaining the purpose, providers, data categories, retention and withdrawal channel.
+2. KeyLo sends a one-time password to the subscriber’s phone. Digital signature or a scanned physical consent form is an assisted fallback; a form upload is access-controlled and virus-scanned.
+3. Subscriber enters the OTP. Only a successful verification creates an active consent. KeyLo stores the deal, subscriber, purpose, provider, disclosure version, method, IP, initiating user, OTP verification time and consent id.
 4. A provider call is blocked unless active consent covers the specific purpose. The score snapshot stores consent id, provider reference, retrieval time and expiry.
-5. Withdrawal marks consent revoked, blocks new pulls, flags active decisions for review and starts a retention/deletion workflow. It does not silently erase legally required audit records.
+5. Withdrawal marks consent revoked, blocks future pulls, flags active decisions for review and starts a retention/deletion workflow. It does not silently erase legally required audit records.
 
 This flow is designed around Uganda’s Personal Data Protection Act and must be reviewed with local counsel and each CRB/MNO’s terms before launch.
 
