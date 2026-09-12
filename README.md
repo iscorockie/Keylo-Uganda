@@ -25,6 +25,9 @@ app/                 Next app shell, dashboard page and styling
 lib/risk.ts          Pure rule-based asset + subscriber scoring engine v1
 db/schema.sql        PostgreSQL tenancy, consent, signal and underwriting schema
 docs/integrations.md  gnuGrid, MTN MoMo and Airtel integration boundary
+docs/mvp-foundations.md  RBAC, consent, journeys, pricing and scope decisions
+docs/risk-features.md  Underwriting feature catalog
+docs/payment-api.md  Payment API boundary and environment contract
 ```
 
 ## MVP scoring logic
