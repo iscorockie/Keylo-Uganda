@@ -1,5 +1,5 @@
-import bcrypt from "bcryptjs";
 import { get, run, all, newId, now } from "../src/lib/db";
+import { hashPassword } from "../src/lib/password";
 
 // ---------------------------------------------------------------------------
 // Permission catalog (matches docs/01 + docs/03)
@@ -117,11 +117,15 @@ async function main() {
   console.log("✓ 1 organization + risk rules");
 
   // Users + memberships
-  const passwordHash = await bcrypt.hash("demo1234", 10);
+  // Demo password is shared for convenience; each is stored as a bcrypt hash
+  // (cost factor from BCRYPT_ROUNDS, default 12). Re-hash on every seed so
+  // existing dev databases pick up a stronger cost factor when it changes.
+  const DEMO_PASSWORD = "demo1234";
+  const passwordHash = await hashPassword(DEMO_PASSWORD);
   for (const u of DEMO_USERS) {
     let user = get<{ id: string }>("SELECT id FROM users WHERE email = ?", u.email);
     if (user) {
-      run("UPDATE users SET fullName = ? WHERE id = ?", u.fullName, user.id);
+      run("UPDATE users SET fullName = ?, passwordHash = ?, updatedAt = ? WHERE id = ?", u.fullName, passwordHash, now(), user.id);
     } else {
       const uid = newId();
       run("INSERT INTO users (id, email, fullName, passwordHash, status, createdAt, updatedAt) VALUES (?,?,?,?,?,?,?)", uid, u.email, u.fullName, passwordHash, "active", now(), now());
@@ -137,7 +141,7 @@ async function main() {
   }
   console.log(`✓ ${DEMO_USERS.length} users`);
 
-  console.log("\nDone. Demo login (password 'demo1234' for all):");
+  console.log(`\nDone. Demo login (password '${DEMO_PASSWORD}' for all):`);
   for (const u of DEMO_USERS) console.log(`  ${u.email.padEnd(26)} → ${u.role}`);
 }
 
